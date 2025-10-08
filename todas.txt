@@ -1,0 +1,7 @@
+# Muchos miniherramientas juntas
+
+# PIXEL ART
+* color_click_app.py = Es dantro de lo que cabe bastante controlado pero es bastante manual. (Recomendado usar 2 pantallas)
+* auto_click_color.py = Es color_click_app pero automatisado cuidado con esta herramienta 
+
+
