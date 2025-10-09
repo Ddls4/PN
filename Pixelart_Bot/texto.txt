@@ -1,0 +1,37 @@
+V0.1
+Cumpla estos requisitos:
+* Tenga interfaz
+* Unos botones que sean para guardar y cargar plantillas y tienen que usar los nombres del JSON.
+* Un espacio para crear los diseños
+* Un botón que sea un puntero de donde va a crear el diseño
+* Un botón que sea para generar el diseño
+
+* Funcionar con arrastrando líneas para ser más rápido
+* Un botón que muestra la posición con un clic - ejecutar en otro Thread
+* Una sesión en la app que sea un texto que cambie.
+-------------------------------------------------
+
+V0.1.5 
+✅ time.sleep() reemplazado por after() → interfaz no se congela
+✅ Velocidad de dibujo configurable con DRAW_SPEED
+✅ Soporte para limpiar lienzo
+✅ JSON guarda también el tamaño de la grilla (grid + size)
+Input de control:
+GRID_SIZE → tamaño de la grilla (ej. 16, 32, 64)
+CELL_SIZE → tamaño visual de cada celda
+DRAW_SPEED → velocidad de dibujo
+Agregar un tamaño maximo de ventana y cambiar los imputs por siders
+Poder pausar el Bot en cualquier momento y que pueda continuar ejecutado 
+------------------------------------------------------------
+
+V0.2
+Mejoras al codigo:
+* Input para controlar la app
+    - GRID_SIZE → tamaño de la grilla (ej. 16, 32, 64)
+    - CELL_SIZE → tamaño visual de cada celda
+    - DRAW_SPEED → velocidad de dibujo
+    + DRAW_CELL_SIZE → 
+    - Boton para cargar los cambios
+* Boton "Nuevo diseño" para resetear la plantillas
+* Cambiar la interfaz
+* Poder poner pausa letra "P"

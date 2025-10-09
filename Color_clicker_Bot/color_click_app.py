@@ -4,7 +4,7 @@ import pyautogui
 from PIL import Image
 
 # === CONFIGURACIÓN ===
-COLOR_OBJETIVO = (255, 127, 39)  # RGB que querés buscar
+COLOR_OBJETIVO = (209, 128, 81)  # RGB que querés buscar
 TOLERANCIA = 1  # margen de error de color (0 = exacto)
 clicks_realizados = set()
 clics_reales_activados = False

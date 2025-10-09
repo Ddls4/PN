@@ -1,0 +1,4 @@
+# https://customtkinter.tomschimansky.com/documentation/packaging
+# sin utilizar clases
+# https://customtkinter.tomschimansky.com/documentation/windows/window
+# usar el after
