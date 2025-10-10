@@ -11,7 +11,8 @@ import json
 import os
 
 running = False  # Control global del bot
-ARCHIVO_COLORES = "colores.json"
+ARCHIVO_COLORES = "colores.json" # colores_guardados
+
 
 def start_bot(r, g, b, tol, dist_min):
     global running
@@ -19,8 +20,12 @@ def start_bot(r, g, b, tol, dist_min):
     
     puntos = None
     if os.path.exists("puntos_temp.npy"):
-        puntos = np.load("puntos_temp.npy")
-        os.remove("puntos_temp.npy")  # Limpia el archivo temporal
+        try:
+            puntos = np.load("puntos_temp.npy")
+            os.remove("puntos_temp.npy")
+        except Exception as e:
+            print(f"⚠️ Error al cargar puntos temporales: {e}")
+            puntos = None
 
     if puntos is None:
         screen = pyautogui.screenshot()
@@ -44,18 +49,14 @@ def start_bot(r, g, b, tol, dist_min):
     print(f"🎯 {len(coords)} puntos a procesar.")
     puntos_usados = []
 
+    usado_mask = np.zeros(mask.shape, dtype=bool)
     for p in coords:
         x, y = p[0]
-
-        if not running:
-            print("🛑 Bot detenido.")
-            return
-
-        if any(math.dist((x, y), q) < dist_min for q in puntos_usados):
+        if usado_mask[y, x]:  # ya visitado
             continue
 
         pyautogui.click(x, y)
-        puntos_usados.append((x, y))
+        usado_mask[y-dist_min:y+dist_min, x-dist_min:x+dist_min] = True
         time.sleep(0.001)
 
         if keyboard.is_pressed("esc"):
@@ -64,39 +65,6 @@ def start_bot(r, g, b, tol, dist_min):
             return
 
     print("✅ Proceso completado.")
-
-def vista_previa(r, g, b, tol):
-    screen = pyautogui.screenshot()
-    img_rgb = np.array(screen)
-    img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
-
-    color_rgb = (r, g, b)
-    color_bgr = tuple(reversed(color_rgb))
-    min_color = np.array([max(0, c - tol) for c in color_bgr])
-    max_color = np.array([min(255, c + tol) for c in color_bgr])
-    mascara = cv2.inRange(img_bgr, min_color, max_color)
-
-    puntos = cv2.findNonZero(mascara)
-    if puntos is not None:
-        for p in puntos:
-            x, y = p[0]
-            cv2.circle(img_bgr, (x, y), 1, (0, 0, 255), -1)
-
-    cv2.imshow("Vista previa - detección precisa", img_bgr)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-    if puntos is not None:
-        respuesta = messagebox.askyesno(
-            "Editar puntos", "¿Deseas editar los puntos detectados antes de continuar?"
-        )
-        if respuesta:
-            puntos_editados = editar_puntos(img_bgr, puntos)
-            if puntos_editados is not None:
-                np.save("puntos_temp.npy", puntos_editados)
-                messagebox.showinfo("Guardado", "Puntos editados guardados temporalmente.")
-            else:
-                messagebox.showwarning("Cancelado", "Edición cancelada.")
 
 def iniciar():
     try:
@@ -123,44 +91,89 @@ def detener():
     running = False
     print("🛑 Bot detenido manualmente.")
 
-def editar_puntos(img, puntos):
-    print("🖱 Fase de edición: clic para quitar/agregar puntos. ENTER = continuar, ESC = cancelar.")
-    puntos_activos = set(tuple(p[0]) for p in puntos)
-    
+def vista_previa_y_editar(r, g, b, tol):
+    screen = pyautogui.screenshot()
+    img_rgb = np.array(screen)
+    img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
+
+    color_rgb = (r, g, b)
+    color_bgr = tuple(reversed(color_rgb))
+    min_color = np.array([max(0, c - tol) for c in color_bgr])
+    max_color = np.array([min(255, c + tol) for c in color_bgr])
+    mascara = cv2.inRange(img_bgr, min_color, max_color)
+    puntos = cv2.findNonZero(mascara)
+    puntos_activos = set(tuple(p[0]) for p in puntos) if puntos is not None else set()
+
+    print("🖱 Editor integrado: clic = borrar/agregar | ENTER = guardar | ESC = salir | R = restaurar")
+    print("Usa + / - para zoom ")
+    print("Usa [ / ] para cambiar tamaño de pincel")
+
+    zoom = 1.0
+    brush_size = 5
+    ventana = "Vista previa - edición activa"
+    img_original = img_bgr.copy()
+
     def actualizar_vista():
-        temp = img.copy()
+        vista = img_original.copy()
+        overlay = np.zeros_like(vista, np.uint8)
+
+        # Dibujar puntos activos como verde brillante (no confunde con rojos)
         for x, y in puntos_activos:
-            cv2.circle(temp, (x, y), 2, (0, 0, 255), -1)
-        cv2.imshow("Editor de puntos", temp)
+            cv2.circle(overlay, (x, y), 2, (0, 255, 0), -1)
+
+        # Combinar imagen original con overlay
+        vista = cv2.addWeighted(vista, 0.85, overlay, 0.5, 0)
+        zoomed = cv2.resize(vista, None, fx=zoom, fy=zoom, interpolation=cv2.INTER_NEAREST)
+        cv2.imshow(ventana, zoomed)
 
     def click_event(event, x, y, flags, param):
+        nonlocal puntos_activos
+        real_x, real_y = int(x / zoom), int(y / zoom)
         if event == cv2.EVENT_LBUTTONDOWN:
-            punto = (x, y)
-            cercano = min(
-                puntos_activos,
-                key=lambda p: (p[0] - x) ** 2 + (p[1] - y) ** 2,
-                default=None
-            )
-            if cercano and abs(cercano[0] - x) < 3 and abs(cercano[1] - y) < 3:
-                puntos_activos.remove(cercano)
-                print(f"❌ Quitado punto {cercano}")
+            eliminados = {p for p in puntos_activos if abs(p[0] - real_x) <= brush_size and abs(p[1] - real_y) <= brush_size}
+            if eliminados:
+                for p in eliminados: puntos_activos.remove(p)
             else:
-                puntos_activos.add(punto)
-                print(f"➕ Agregado punto {punto}")
+                nuevos = [(real_x + dx, real_y + dy)
+                          for dx in range(-brush_size, brush_size + 1)
+                          for dy in range(-brush_size, brush_size + 1)
+                          if 0 <= real_x + dx < img_bgr.shape[1] and 0 <= real_y + dy < img_bgr.shape[0]]
+                puntos_activos.update(nuevos)
             actualizar_vista()
 
-    cv2.namedWindow("Editor de puntos")
-    cv2.setMouseCallback("Editor de puntos", click_event)
+    cv2.namedWindow(ventana, cv2.WINDOW_NORMAL)
+    cv2.setMouseCallback(ventana, click_event)
     actualizar_vista()
 
     while True:
-        key = cv2.waitKey(1) & 0xFF
-        if key == 13:  # ENTER = aceptar
+        key = cv2.waitKey(30) & 0xFF
+        if key == 13:  # ENTER
             cv2.destroyAllWindows()
-            return np.array([[x, y] for (x, y) in puntos_activos])
-        elif key == 27:  # ESC = cancelar
+            np.save("puntos_temp.npy", np.array([[x, y] for (x, y) in puntos_activos]))
+            messagebox.showinfo("Guardado", "Puntos guardados temporalmente.")
+            break
+        elif key == 27:  # ESC
             cv2.destroyAllWindows()
-            return None
+            messagebox.showwarning("Cancelado", "Edición cancelada.")
+            break
+        elif key == ord('r'):
+            puntos_activos = set(tuple(p[0]) for p in puntos)
+            actualizar_vista()
+        elif key == ord('+') or key == ord('='):
+            zoom = min(5.0, zoom + 0.2)
+            actualizar_vista()
+        elif key == ord('-') and zoom > 0.4:
+            zoom = max(0.4, zoom - 0.2)
+            actualizar_vista()
+        elif key == ord(']'):
+            brush_size = min(50, brush_size + 2)
+            print(f"🖌 Tamaño de pincel: {brush_size}")
+        elif key == ord('['):
+            brush_size = max(1, brush_size - 2)
+            print(f"🖌 Tamaño de pincel: {brush_size}")
+        elif key == ord('z'):
+            zoom = 1.0
+            actualizar_vista()
 
 def cargar_colores_guardados():
     if os.path.exists(ARCHIVO_COLORES):
@@ -190,6 +203,10 @@ def guardar_color_actual():
         return
 
     nombre = f"Color {r},{g},{b}"
+    if any(c["rgb"] == [r, g, b] for c in colores):
+        messagebox.showinfo("Duplicado", "Ese color ya está guardado.")
+        return
+
     colores.append({"nombre": nombre, "rgb": [r, g, b]})
     guardar_colores(colores)
     actualizar_lista_colores()
@@ -211,56 +228,72 @@ def cargar_color_desde_lista(event):
     entry_g.delete(0, tk.END); entry_g.insert(0, rgb[1])
     entry_b.delete(0, tk.END); entry_b.insert(0, rgb[2])
 
-
-# GUI
-root = tk.Tk()
-root.title("AutoPixelBot")
-root.geometry("300x320")
-
-tk.Label(root, text="🎨 AutoPixelBot", font=("Arial", 14, "bold")).pack(pady=5)
-tk.Label(root, text="Color objetivo (RGB)").pack()
-frame_rgb = tk.Frame(root)
-frame_rgb.pack()
-entry_r = tk.Entry(frame_rgb, width=5); entry_r.insert(0, "0"); entry_r.pack(side="left")
-entry_g = tk.Entry(frame_rgb, width=5); entry_g.insert(0, "0"); entry_g.pack(side="left")
-entry_b = tk.Entry(frame_rgb, width=5); entry_b.insert(0, "0"); entry_b.pack(side="left")
-
-tk.Label(root, text="Tolerancia:").pack()
-entry_tol = tk.Entry(root, width=10)
-entry_tol.insert(0, "10")
-entry_tol.pack()
-
-tk.Label(root, text="Distancia mínima (px):").pack()
-entry_dist = tk.Entry(root, width=10)
-entry_dist.insert(0, "10")
-entry_dist.pack()
-
-tk.Button(root, text="Vista previa", command=lambda: vista_previa(
-    int(entry_r.get()), int(entry_g.get()), int(entry_b.get()), int(entry_tol.get()))
-).pack(pady=5)
-
-tk.Button(root, text="Iniciar", bg="lightgreen", command=iniciar).pack(pady=5)
-tk.Button(root, text="🛑 Parar", bg="red", command=detener).pack(pady=5)
-
-tk.Label(root, text="(Pulsa ESC para detener en emergencia)", fg="gray").pack(pady=10)
-
-
-# Cargar colores desde JSON
 colores = cargar_colores_guardados()
+# GUI
+# --- Ventana principal ---
+root = tk.Tk()
+root.title("🎨 AutoPixelBot")
+root.geometry("600x360")
+root.resizable(False, False)
 
-# Panel lateral de colores
-frame_colores = tk.Frame(root, bd=2, relief="groove")
-frame_colores.place(x=320, y=10, width=250, height=300)
+# --- Panel Izquierdo: Configuración ---
+frame_left = tk.Frame(root, padx=10, pady=10)
+frame_left.pack(side="left", fill="y")
 
-tk.Label(frame_colores, text="🎨 Colores guardados", font=("Arial", 10, "bold")).pack(pady=5)
-tk.Button(frame_colores, text="Obtener color bajo cursor", command=obtener_color_cursor).pack(pady=3)
-tk.Button(frame_colores, text="Guardar color actual", command=guardar_color_actual).pack(pady=3)
+tk.Label(frame_left, text="AutoPixelBot", font=("Arial", 16, "bold")).grid(row=0, column=0, columnspan=3, pady=(0, 10))
 
-lista_colores = tk.Listbox(frame_colores, height=10)
-lista_colores.pack(pady=5, fill="both", expand=True)
+# Entradas RGB
+tk.Label(frame_left, text="Color objetivo (RGB):").grid(row=1, column=0, columnspan=3, sticky="w")
+entry_r = tk.Entry(frame_left, width=5); entry_r.insert(0, "0"); entry_r.grid(row=2, column=0)
+entry_g = tk.Entry(frame_left, width=5); entry_g.insert(0, "0"); entry_g.grid(row=2, column=1)
+entry_b = tk.Entry(frame_left, width=5); entry_b.insert(0, "0"); entry_b.grid(row=2, column=2)
+
+# Tolerancia
+tk.Label(frame_left, text="Tolerancia:").grid(row=3, column=0, columnspan=3, sticky="w", pady=(10, 0))
+entry_tol = tk.Entry(frame_left, width=10)
+entry_tol.insert(0, "10")
+entry_tol.grid(row=4, column=0, columnspan=3)
+
+# Distancia mínima
+tk.Label(frame_left, text="Distancia mínima (px):").grid(row=5, column=0, columnspan=3, sticky="w", pady=(10, 0))
+entry_dist = tk.Entry(frame_left, width=10)
+entry_dist.insert(0, "10")
+entry_dist.grid(row=6, column=0, columnspan=3)
+
+# Botones principales
+tk.Button(frame_left, text="🖼 Vista previa", width=18,
+          command=lambda: vista_previa_y_editar(
+              int(entry_r.get()), int(entry_g.get()), int(entry_b.get()), int(entry_tol.get()))
+          ).grid(row=7, column=0, columnspan=3, pady=(15, 3))
+
+tk.Button(frame_left, text="▶ Iniciar", bg="lightgreen", width=18, command=iniciar).grid(row=8, column=0, columnspan=3, pady=3)
+tk.Button(frame_left, text="🛑 Parar", bg="red", fg="white", width=18, command=detener).grid(row=9, column=0, columnspan=3, pady=3)
+
+tk.Label(frame_left, text="Pulsa ESC para detener en emergencia", fg="gray", font=("Arial", 8)).grid(row=10, column=0, columnspan=3, pady=(10, 0))
+
+# --- Panel Derecho: Colores guardados ---
+frame_right = tk.Frame(root, bd=2, relief="groove", padx=10, pady=10)
+frame_right.pack(side="right", fill="both", expand=True)
+
+tk.Label(frame_right, text="🎨 Colores guardados", font=("Arial", 12, "bold")).pack(pady=(0, 10))
+
+btn_color_cursor = tk.Button(frame_right, text="🎯 Obtener color bajo cursor", command=obtener_color_cursor)
+btn_color_cursor.pack(fill="x", pady=2)
+
+btn_guardar_color = tk.Button(frame_right, text="💾 Guardar color actual", command=guardar_color_actual)
+btn_guardar_color.pack(fill="x", pady=2)
+
+lista_colores = tk.Listbox(frame_right, height=12)
+lista_colores.pack(fill="both", expand=True, pady=8)
 lista_colores.bind("<<ListboxSelect>>", cargar_color_desde_lista)
 
-actualizar_lista_colores()
+# Si tienes más funciones, como editar o eliminar color, podrías agregar botones aquí:
+frame_botones_colores = tk.Frame(frame_right)
+frame_botones_colores.pack(fill="x")
+tk.Button(frame_botones_colores, text="✏️ Editar puntos", command=lambda: print("Editar puntos (futuro)")).pack(side="left", expand=True, fill="x", padx=2)
+tk.Button(frame_botones_colores, text="🗑 Eliminar color", command=lambda: print("Eliminar color (futuro)")).pack(side="left", expand=True, fill="x", padx=2)
 
+# Actualizar la lista inicial
+actualizar_lista_colores()
 
 root.mainloop()
