@@ -1,0 +1,52 @@
+Separar codigo
+* Carpeta -> Funciones
+* Carpeta -> UI / UX
+* Mein.py -> ejecutable 
+
+"""
+traductor_completo.py
+
+Características:
+- Pestañas: Online, Offline, Configuración
+- Traducción online con deep_translator.GoogleTranslator (botón Traducir)
+- Traductor offline con argostranslate (si está instalado y configurado)
+- Voice->Text (solo ORIGEN) usando speech_recognition
+- Text->Voice (pyttsx3) ambos cuadros
+- Exportar a Word (python-docx)
+- Historial de traducciones (lista interna + ver/cargar)
+- Intercambiar idiomas
+- Modo claro/oscuro (ttk.Style toggle)
+"""
+"""
+pip install deep-translator speechrecognition pyttsx3 python-docx
+
+pip install pipwin
+pip install pyaudio
+
+"""
+
+- TAB -
+Zonas de gui
+
+traductor_app/
+│
+├── main.py  ->  Ejecutable
+│
+├── ui/
+│   ├── __init__.py
+│   ├── traductor_ui.py  -> llama funciones externas
+│   ├── styles.py
+│
+├── services/
+│   ├── __init__.py
+│   ├── traduccion_service.py  ->  deep_translator
+│   ├── tts_service.py  -> TTS
+│   ├── stt_service.py  ->  microfono - speech_recognition
+│   ├── historial_service.py  -> traductor_history
+│
+├── core/
+│   ├── __init__.py
+│   ├── idiomas.py  ->  Configuración e idiomas
+│   ├── config.py
+│
+└── requirements.txt

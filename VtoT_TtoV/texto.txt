@@ -1,0 +1,291 @@
+Administración de Microsoft Server
+🖥️ 1. Comandos del Sistema
+Comandos de archivos y directorios
+Comando
+Función
+Uso típico
+cd
+Cambiar carpeta
+Navegar entre directorios
+dir
+Listar contenido
+Ver archivos y carpetas
+copy
+Copiar archivos
+Respaldos rápidos
+move
+Mover archivos
+Organización de archivos
+del
+Eliminar archivos
+Limpieza
+rmdir
+Eliminar carpeta vacía
+Borrar directorios
+md
+Crear carpeta
+Organización
+rename
+Renombrar
+Cambios de nombre
+tree
+Ver estructura
+Revisar jerarquías
+type
+Mostrar texto
+Leer archivos .txt
+
+Comandos de sistema
+Comando
+Función
+systeminfo
+Información del sistema
+ver
+Versión del SO
+driverquery
+Lista drivers
+tasklist / taskkill
+Ver o finalizar procesos
+sfc /scannow
+Reparar archivos del sistema
+chkdsk
+Analizar y reparar discos
+cleanmgr
+Limpieza de disco
+powercfg
+Configuración de energía
+schtasks
+Programar tareas
+shutdown
+Apagar o reiniciar
+format / cipher
+Formato y limpieza segura
+help / cls / exit
+Ayuda, limpiar pantalla, salir
+
+Comandos de red
+Comando
+Función
+ping
+Comprobar conectividad
+pathping
+Trazado + análisis
+tracert
+Ruta hacia un destino
+ipconfig
+Configuración IP
+netstat
+Puertos y conexiones
+
+
+ Administración en Red Interna
+Funciones del servidor local
+Concepto
+Descripción
+Servidor local
+Equipo que ofrece servicios dentro de una LAN
+AD DS
+Control de usuarios, equipos y políticas
+DNS
+Traducción nombre ↔ IP
+DHCP
+Asignación de IP automática
+Servidor de archivos / impresión
+Compartir recursos
+IIS
+Servidor web
+SQL / MySQL
+Bases de datos
+
+
+Herramientas de administración
+Herramienta
+Uso
+Server Manager
+Agregar roles, administrar servidor
+MMC
+Consolas administrativas personalizables
+PowerShell
+Administración avanzada y scripts
+Computer Management
+Usuarios, discos, servicios
+RSAT
+Administrar servidores desde PCs remotas
+
+
+Configuración de IP estática
+Parámetro
+Ejemplo
+IP
+192.168.1.10
+Máscara
+255.255.255.0
+Puerta de enlace
+192.168.1.1
+DNS
+El propio servidor o externo
+
+
+Agregar un rol (ej. DNS)
+Paso
+Acción
+1
+Abrir Administrador del servidor
+2
+Administrar > Agregar roles
+3
+Seleccionar servidor
+4
+Marcar rol (DNS, DHCP, etc.)
+5
+Instalar y configurar
+
+
+
+Administración Remota
+Servicios y protocolos
+Servicio / Protocolo
+Uso
+Puerto
+RDP
+Escritorio remoto
+3389/TCP
+WinRM
+PowerShell remoto
+5985/5986
+SNMP
+Monitoreo
+161/UDP
+SSH
+Acceso seguro (si está instalado)
+22
+
+
+Herramientas para administrar remotamente
+Herramienta
+Característica
+Ventaja
+RDP
+Acceso visual al escritorio
+Control completo
+PowerShell Remoting
+Comandos remotos
+Automatización avanzada
+Server Manager
+Agregar y administrar servidores remotos
+Administración centralizada
+RSAT
+Consolas administrativas desde un cliente
+Gestión desde cualquier PC
+
+Seguridad en conexiones remotas
+Buenas Prácticas
+Errores Comunes
+Protocolos cifrados (HTTPS, SSH)
+Contraseñas débiles
+VPN o firewall configurado
+No actualizar el servidor
+MFA
+Abrir puertos innecesarios
+Restricción por IP
+Permitir acceso admin sin control
+Auditoría y logs
+No usar certificados
+
+
+
+
+
+ Tabla Comparativa: Emulación vs Virtualización
+Característica
+Emulación
+Virtualización
+Qué es
+Reproduce por software el hardware completo de otro sistema (incluso arquitecturas diferentes).
+Crea máquinas virtuales que comparten el hardware real del host (misma arquitectura).
+Arquitecturas compatibles
+Diferentes (ej: emular ARM en x86).
+La misma arquitectura que el host (ej: Windows sobre Windows, Linux sobre x86).
+Rendimiento
+Bajo (trabaja traduciendo o interpretando instrucciones).
+Alto (usa hardware real mediante hipervisores).
+Flexibilidad
+Muy alta: permite ejecutar sistemas muy antiguos o de otro tipo de hardware.
+Alta: permite múltiples sistemas operativos modernos, pero limitados a la arquitectura.
+Uso del hardware
+No usa directamente el hardware físico; todo es simulado.
+Aprovecha CPU, RAM, red y dispositivos reales.
+Complejidad
+Mayor: requiere simular componentes enteros.
+Menor: sólo abstracta hardware existente.
+Ejemplos de software
+QEMU, BOCHS, MAME, BlueStacks (Android en PC), Emuladores de consolas.
+Hyper-V, VMware, VirtualBox, Proxmox, KVM.
+
+¿Cuándo usar Emulación?
+Situación
+¿Es Emulación la mejor opción?
+Motivo
+Ejecutar software de una arquitectura distinta (ej: ARM → x86)
+Sí
+Permite traducir instrucciones entre arquitecturas diferentes.
+Correr sistemas muy antiguos o consolas retro
+Sí
+Simula hardware que ya no existe.
+Pruebas de compatibilidad con hardware inexistente
+Sí
+Se puede recrear casi cualquier plataforma.
+Necesitas alto rendimiento
+No
+La emulación es más lenta.
+Virtualización no es soportada por el CPU
+Sí
+Emuladores no requieren VT-x/AMD-V.
+
+¿Cuándo usar Virtualización?
+Situación
+¿Es la Virtualización la mejor opción?
+Motivo
+Crear múltiples sistemas operativos en un mismo hardware
+Sí
+Excelente rendimiento y aislamiento.
+Servidores empresariales (Windows Server, Linux)
+Sí
+Ideal para producción y alta disponibilidad.
+Pruebas de software, entornos de desarrollo
+Sí
+Rápido, seguro y eficiente.
+Necesidad de hardware especializado simulado
+No
+Virtualización solo réplica hardware existente.
+Ejecutar SO de arquitectura distinta
+No
+La virtualización no traduce arquitecturas.
+
+Aplicaciones recomendadas
+Aplicación / Caso de uso
+Mejor opción
+Explicación
+Consolas retro (PS1, NES, SNES, Sega)
+Emulación
+Requiere simular hardware antiguo.
+Ejecutar Android en PC
+Emulación
+Android corre sobre ARM por lo general.
+Laboratorios de redes o servidores
+Virtualización
+Mayor rendimiento, soporte empresarial.
+Pruebas de malware o entornos aislados
+Virtualización
+Rápidos de restaurar y con buen aislamiento.
+Ejecutar Windows 95, DOS o sistemas obsoletos
+Emulación
+Hardware discontinuado puede simularse completo.
+Infraestructura Cloud (Azure, AWS, VMware)
+Virtualización
+Optimizada para escalabilidad y performance.
+Ejecutar un sistema operativo móvil en PC
+Emulación
+Es otra arquitectura.
+
+
