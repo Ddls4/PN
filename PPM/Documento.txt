@@ -1,0 +1,167 @@
+PythonPixelManager (PPM) – Automatización y análisis de píxeles por paletas de color
+
+1- Descripción del proyecto
+2- Módulos / herramientas
+3- Interfaz
+4- Lógica del Bot
+5- Algoritmos importantes (ej. comparación de colores)
+
+1) Descripción del proyecto 
+Descripción general del proyecto
+Aplicación en Python orientada a la automatización y análisis de píxeles en pantalla, basada en el uso de paletas de colores. Permite capturar colores, comparar similitudes, automatizar la colocación de píxeles y recomendar colores visualmente cercanos mediante análisis de imagen. 
+
+2) Módulos / herramientas 
+2.1 Módulo de Paletas de Colores
+Funciones relacionadas con la creación y gestión de paletas:
+-Input para ingresar código HTML
+-Extraer automáticamente paletas de colores desde un HTML
+-Input para seleccionar una paleta activa
+-Botón para convertir HTML → paleta de colores
+-Botón para borrar una paleta existente
+
+2.2 Módulo Bot de Pintado Automático
+Automatiza la colocación de píxeles usando un color seleccionado:
+ 
+- Botón para iniciar el bot
+- Botón para iniciar el bot durante X segundos
+- Botón para pausar / continuar
+- Botón para detener el bot y limpiar el estado
+
+2.3 Módulo Buscador / Recomendador de Colores
+Sistema de análisis visual y recomendación:
+- Analiza un color capturado desde la pantalla 
+- Compara el color con los colores de la paleta activa
+- Recomienda el color más parecido
+- Muestra el color recomendado visualmente (no solo el código HEX)
+- Muestra el nivel de similitud (escala numérica)
+-
+3) Interfaz 
+Sección 1: Configuración / Paletas
+Todo lo que no ejecuta acciones, solo prepara datos
+Tamaño de captura
+Nombre de paleta
+HTML
+Guardar / eliminar paleta
+Sección 2: Pintado Automático
+Acciones que modifican el estado del sistema
+Color de búsqueda
+Velocidad
+Dirección / colocación
+Botones de control (iniciar, pausar, detener)
+
+[ Parámetros ]
+- color
+- velocidad
+- dirección
+[ Controles ]
+- iniciar
+- pausar
+- detener
+
+Sección 3: Recomendar Colores
+Análisis / decisión asistida
+Mostrar siempre:
+Color detectado
+Color recomendado
+Diferencia numérica
+
+
+
+5) Lógica del Bot
+Estados del Bot
+IDLE (detenido)
+SEARCH (búsqueda / selección)
+RUNNING (pintando)
+PAUSED (pausado)
+Controles por teclado
+F1 → Entrar en modo búsqueda de color / píxeles
+F2 → Iniciar bot
+F3 → Pausar / continuar
+F4 → Detener bot y limpiar estado
+
+
+Lógica de Recomendación de Colores
+- Usar la paleta de colores activa
+- Capturar una región de la pantalla
+- Analizar el color detectado
+- Calcular cuál color de la paleta es más parecido
+-Mostrar: Color más cercano
+Nivel de similitud
+Ejemplo de escala de similitud:
+0–1 → Muy similar
+2–3 → Similar
+4–5 → Diferente
+>5 → Muy diferente
+
+5) Algoritmos importantes (ej. comparación de colores) 
+1️⃣ Gestión de paletas (HTML → Paleta) 
+def extraer_paleta_html(html, columnas):
+    hexes = re.findall(r'#(?:[0-9A-Fa-f]{6})', html)
+    paleta = {}
+    for i, hex_color in enumerate(hexes):
+        row = i // columnas
+        col = i % columnas
+        paleta[(row, col)] = hex_color
+    return paleta
+
+2️⃣ Conversión y comparación de colores (CORE CRÍTICO) 
+def color_distance(hex1, hex2) -> float:
+    lab1 = hex_to_lab(hex1)
+    lab2 = hex_to_lab(hex2)
+    return np.linalg.norm(lab1 - lab2)
+
+3️⃣ Recomendar color (motor) 
+def recomendar_color(color_hex, paleta: dict) -> tuple:
+    mejor = None
+    menor = float("inf")
+
+    for nombre, hex_base in paleta.items():
+        d = color_distance(color_hex, hex_base)
+        if d < menor:
+            menor = d
+            mejor = (nombre, hex_base, d)
+
+    return mejor
+
+4️⃣ Captura de pixel (eyedropper) 
+def capturar_pixel(x, y):
+    img = ImageGrab.grab()
+    r, g, b = img.getpixel((x, y))
+    return f"#{r:02X}{g:02X}{b:02X}"
+
+BOT AUTOMÁTICO  
+5️⃣ Detección de píxeles por color
+mask = cv2.inRange(img_bgr, lower, upper)
+coords = cv2.findNonZero(mask)
+6️⃣ Orden de procesamiento 
+def ordenar_coords(coords, modo):
+    if modo == "LR":
+        return sorted(coords, key=lambda p: (p[0][1], p[0][0]))
+7️⃣ Editor visual de píxeles 
+
+8️⃣ Guardado de colores 
+json.dump(colores)
+
+Estructura sugerida
+PPM/
+│
+├── ui/
+│   ├── main_window.py
+│   ├── config_tab.py
+│   ├── bot_tab.py
+│   ├── color_recommender_tab.py
+│   └── advanced_recognition_tab.py
+│
+├── core/
+│   ├── palette_manager.py -
+│   ├── bot_controller.py  -
+│   ├── color_analyzer.py  - 
+│   ├── screen_capture.py  -
+│   └── state_manager.py
+│
+├── utils/
+│   ├── color_utils.py
+│   ├── hex_rgb.py
+│   └── math_utils.py
+│
+└── main.py

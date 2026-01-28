@@ -1,0 +1,5 @@
+# IDLE / SEARCH / RUN 
+
+PALETA_GUIA = {}
+
+
