@@ -4,6 +4,7 @@ from tkinter import ttk, scrolledtext, messagebox
 from ui.config_tab import ConfigTab
 from ui.color_rec_tab import ColorRecTab
 from ui.bot_tab import Bottab
+from ui.Pixel_Color_tab import PixelColorTab
 
 from core.paleta import PaletteManager
 
@@ -38,5 +39,10 @@ class MainWindow(tk.Tk):
         notebook.add(
             Bottab(notebook, self.context),
             text="Bot "
+        )
+        
+        notebook.add(
+            PixelColorTab(notebook, self.context),
+            text="Contar Colores"
         )
 

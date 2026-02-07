@@ -2,8 +2,7 @@
 from tkinter import ttk, messagebox
 import threading
 
-from core.bot import start_bot, stop_bot
-from core.bot import vista_previa_y_editar_hex
+from core.bot import start_bot, stop_bot, vista_previa_y_editar_hex
 
 
 class Bottab(ttk.Frame):
@@ -17,53 +16,74 @@ class Bottab(ttk.Frame):
             row=0, column=0, columnspan=2, pady=10
         )
 
+        # =========================
         # Color HEX
-        ttk.Label(self, text="Color HEX (#RRGGBB)").grid(row=1, column=0, sticky="w")
+        # =========================
+        ttk.Label(self, text="Color HEX (#RRGGBB)").grid(
+            row=1, column=0, sticky="w"
+        )
         self.entry_hex = ttk.Entry(self)
         self.entry_hex.insert(0, "#FFFFFF")
         self.entry_hex.grid(row=1, column=1, padx=10, pady=5)
 
+        # =========================
         # Tolerancia
-        ttk.Label(self, text="Tolerancia").grid(row=2, column=0, sticky="w")
+        # =========================
+        ttk.Label(
+            self,
+            text="Tolerancia (detección de color)"
+        ).grid(row=2, column=0, sticky="w")
+
         self.entry_tol = ttk.Entry(self)
-        self.entry_tol.insert(0, "10")
+        self.entry_tol.insert(0, "1")
         self.entry_tol.grid(row=2, column=1, padx=10, pady=5)
 
-        # Distancia mínima
-        ttk.Label(self, text="Distancia mínima").grid(row=3, column=0, sticky="w")
-        self.entry_dist = ttk.Entry(self)
-        self.entry_dist.insert(0, "2")
-        self.entry_dist.grid(row=3, column=1, padx=10, pady=5)
-
+        # =========================
         # Orden
-        ttk.Label(self, text="Orden de clics").grid(row=4, column=0, sticky="w")
+        # =========================
+        ttk.Label(self, text="Orden de clics").grid(
+            row=3, column=0, sticky="w"
+        )
         self.combo_orden = ttk.Combobox(
             self,
-            values=["Izquierda → Derecha", "Arriba → Abajo", "Aleatorio"],
+            values=[
+                "Izquierda → Derecha",
+                "Arriba → Abajo",
+                "Aleatorio"
+            ],
             state="readonly"
         )
         self.combo_orden.current(0)
-        self.combo_orden.grid(row=4, column=1, padx=10, pady=5)
+        self.combo_orden.grid(row=3, column=1, padx=10, pady=5)
 
+        # =========================
         # Botones
-        ttk.Button(self, text="▶ Iniciar", command=self.iniciar).grid(
-            row=5, column=0, pady=15
-        )
-        ttk.Button(self, text="⛔ Detener", command=stop_bot).grid(
-            row=5, column=1, pady=15
-        )
+        # =========================
         ttk.Button(
             self,
-            text="👁 Vista previa",
+            text="▶ Iniciar",
+            command=self.iniciar
+        ).grid(row=4, column=0, pady=15)
+
+        ttk.Button(
+            self,
+            text="⛔ Detener",
+            command=stop_bot
+        ).grid(row=4, column=1, pady=15)
+
+        ttk.Button(
+            self,
+            text="👁 Vista previa / Editor",
             command=self.vista_previa
-        ).grid(row=6, column=0, columnspan=2, pady=10)
+        ).grid(row=5, column=0, columnspan=2, pady=10)
 
-
+    # =========================
+    # Acciones
+    # =========================
     def iniciar(self):
         try:
             hex_color = self.entry_hex.get().strip()
             tol = int(self.entry_tol.get())
-            dist = int(self.entry_dist.get())
             orden = self.combo_orden.get()
 
             if not hex_color.startswith("#") or len(hex_color) != 7:
@@ -78,13 +98,13 @@ class Bottab(ttk.Frame):
 
         if not messagebox.askyesno(
             "Confirmar",
-            "¿Seguro que quieres iniciar los clics reales?"
+            "⚠️ El bot hará clics reales.\n¿Deseas continuar?"
         ):
             return
 
         hilo = threading.Thread(
             target=start_bot,
-            args=(hex_color, tol, dist, orden),
+            args=(hex_color, tol, orden),
             daemon=True
         )
         hilo.start()
@@ -97,13 +117,19 @@ class Bottab(ttk.Frame):
 
             if not hex_color.startswith("#") or len(hex_color) != 7:
                 raise ValueError
+
         except ValueError:
             messagebox.showerror("Error", "Valores inválidos")
             return
 
-        vista_previa_y_editar_hex(
-            hex_color=hex_color,
-            tol=tol,
-            usar_area=False,
-            orden=orden
+        # 🔹 Vista previa en hilo para no congelar la UI
+        hilo = threading.Thread(
+            target=vista_previa_y_editar_hex,
+            kwargs=dict(
+                hex_color=hex_color,
+                tol=tol,
+                orden=orden
+            ),
+            daemon=True
         )
+        hilo.start()

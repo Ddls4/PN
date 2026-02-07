@@ -1,4 +1,3 @@
-#bot.py            ← clics
 # bot.py
 import pyautogui
 import numpy as np
@@ -7,98 +6,132 @@ import time
 import keyboard
 import random
 import os
+import mss
 
 running = False
 
-
+# =========================
+# Utils
+# =========================
 def hex_to_rgb(hex_color: str):
     hex_color = hex_color.lstrip("#")
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
+def screenshot_pantalla():
+    with mss.mss() as sct:
+        monitor = sct.monitors[1]
+        img = np.array(sct.grab(monitor))
+    return img[:, :, :3]  # BGR
 
-def start_bot(hex_color, tol, dist_min, orden):
+# =========================
+# PIXEL LÓGICO (GRID)
+# =========================
+def detectar_cell_size(mask):
+    contours, _ = cv2.findContours(
+        mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
+
+    for c in contours:
+        x, y, w, h = cv2.boundingRect(c)
+        if 3 <= w <= 60 and 3 <= h <= 60:
+            return max(w, h)
+
+    return None
+
+def extraer_celdas(mask, cell):
+    h, w = mask.shape
+    celdas = []
+
+    for y in range(0, h, cell):
+        for x in range(0, w, cell):
+            bloque = mask[y:y+cell, x:x+cell]
+            if bloque.size == 0:
+                continue
+
+            if np.count_nonzero(bloque) > (cell * cell * 0.6):
+                celdas.append((x, y))
+
+    return celdas
+
+# =========================
+# BOT
+# =========================
+def start_bot(hex_color, tol, orden):
     global running
+    if running:
+        print("⚠️ El bot ya está en ejecución")
+        return
     running = True
 
-    # =========================
-    # 📌 Cargar puntos editados
-    # =========================
     puntos = None
     if os.path.exists("puntos_temp.npy"):
-        try:
-            puntos = np.load("puntos_temp.npy")
-            os.remove("puntos_temp.npy")  # se usan una sola vez
-            print(f"📌 Usando {len(puntos)} puntos editados")
-        except Exception as e:
-            print("⚠️ Error cargando puntos editados:", e)
-            puntos = None
+        puntos = np.load("puntos_temp.npy")
+        os.remove("puntos_temp.npy")
+
+    img_bgr = screenshot_pantalla()
 
     r, g, b = hex_to_rgb(hex_color)
     color_bgr = (b, g, r)
 
-    screen = pyautogui.screenshot()
-    img_rgb = np.array(screen)
-    img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
-
-    lower = np.array([max(0, c - tol) for c in color_bgr])
-    upper = np.array([min(255, c + tol) for c in color_bgr])
-
-    mask = cv2.inRange(img_bgr, lower, upper)
-    coords = cv2.findNonZero(mask)
-
-    if coords is None or len(coords) == 0:
-        print("⚠️ No se encontraron píxeles.")
-        return
-
+    # =========================
+    # MODO 1 — puntos manuales
+    # =========================
     if puntos is not None:
-        # Usar puntos editados
-        coords = puntos.reshape(-1, 1, 2)
+        grupos = [[tuple(p)] for p in puntos]
+
+    # =========================
+    # MODO 2 — detección por color (FIX ZOOM)
+    # =========================
     else:
-        # Detectar por color
+        lower = np.array([max(0, c - tol) for c in color_bgr])
+        upper = np.array([min(255, c + tol) for c in color_bgr])
+
         mask = cv2.inRange(img_bgr, lower, upper)
-        coords = cv2.findNonZero(mask)
 
-        if coords is None or len(coords) == 0:
-            print("⚠️ No se encontraron píxeles.")
-            return
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+            mask, connectivity=8
+        )
 
-    # Orden
-    if orden == "Izquierda → Derecha":
-        coords = sorted(coords, key=lambda p: (p[0][1], p[0][0]))
-    elif orden == "Arriba → Abajo":
-        coords = sorted(coords, key=lambda p: (p[0][0], p[0][1]))
-    elif orden == "Aleatorio":
-        random.shuffle(coords)
+        grupos = []
 
-    print(f"🎯 {len(coords)} puntos detectados")
+        for i in range(1, num_labels):  # 0 = fondo
+            area = stats[i, cv2.CC_STAT_AREA]
+            cx, cy = centroids[i]
 
-    height, width = img_bgr.shape[:2]
-    usado = np.zeros((height, width), dtype=bool)
+            if area > 10:  # ajustable, evita ruido
+                grupos.append([(int(cx), int(cy))])
 
-    for p in coords:
-        if not running:
-            print("🛑 Bot detenido")
-            return
-
-        x, y = p[0]
-        if usado[y, x]:
-            continue
-
-        pyautogui.click(x, y)
-
-        y1, y2 = max(0, y - dist_min), min(height, y + dist_min)
-        x1, x2 = max(0, x - dist_min), min(width, x + dist_min)
-        usado[y1:y2, x1:x2] = True
-
-        time.sleep(0.001)
-
-        if keyboard.is_pressed("esc"):
+        if not grupos:
+            print("⚠️ No se encontraron píxeles")
             running = False
-            print("🧨 ESC detectado")
             return
 
-    
-    print("✅ Proceso finalizado")
+
+
+
+    # =========================
+    # ORDEN
+    # =========================
+    if orden == "Aleatorio":
+        random.shuffle(grupos)
+    elif orden == "Izquierda → Derecha":
+        grupos.sort(key=lambda g: g[0][0])
+    elif orden == "Arriba → Abajo":
+        grupos.sort(key=lambda g: g[0][1])
+
+    # =========================
+    # CLICKS
+    # =========================
+    for grupo in grupos:
+        if not running or keyboard.is_pressed("esc"):
+            break
+
+        cx, cy = grupo[0]
+        pyautogui.click(cx, cy)
+        time.sleep(0.01)
+
+    running = False
+    print("✅ Bot finalizado")
 
 
 def stop_bot():
@@ -106,32 +139,15 @@ def stop_bot():
     running = False
 
 
-def vista_previa_y_editar_hex(
-    hex_color,
-    tol,
-    usar_area=False,
-    area_w=500,
-    area_h=500,
-    orden="Izquierda → Derecha"
-):
-    # HEX → RGB
-    hex_color = hex_color.lstrip("#")
-    r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-
-    # Captura
-    if usar_area:
-        x, y = pyautogui.position()
-        left = max(0, x - area_w // 2)
-        top = max(0, y - area_h // 2)
-        screen = pyautogui.screenshot(region=(left, top, area_w, area_h))
-    else:
-        screen = pyautogui.screenshot()
-
-    img_rgb = np.array(screen)
-    img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
-
-    # Máscara
+# =========================
+# VISTA PREVIA + EDITOR
+# =========================
+def vista_previa_y_editar_hex(hex_color, tol, orden):
+    r, g, b = hex_to_rgb(hex_color)
     color_bgr = (b, g, r)
+
+    img_bgr = screenshot_pantalla()
+
     lower = np.array([max(0, c - tol) for c in color_bgr])
     upper = np.array([min(255, c + tol) for c in color_bgr])
 
@@ -142,20 +158,9 @@ def vista_previa_y_editar_hex(
         print("⚠️ No se encontraron píxeles.")
         return
 
-    # Orden
-    if orden == "Aleatorio":
-        np.random.shuffle(coords)
-    elif orden == "Arriba → Abajo":
-        coords = sorted(coords, key=lambda p: (p[0][1], p[0][0]))
-    else:
-        coords = sorted(coords, key=lambda p: (p[0][0], p[0][1]))
-
     puntos_originales = set(tuple(p[0]) for p in coords)
     puntos_activos = set(puntos_originales)
 
-    # =========================
-    # 🖱 Editor
-    # =========================
     zoom = 1.0
     brush = 3
     ventana = "Vista previa - Editor BOT"
@@ -164,17 +169,34 @@ def vista_previa_y_editar_hex(
         vista = img_bgr.copy()
         overlay = vista.copy()
 
+        # puntos verdes (detección real)
         for x, y in puntos_activos:
             cv2.circle(overlay, (x, y), 2, (0, 255, 0), -1)
 
+        # =========================
+        # puntos rojos (click real)
+        # =========================
+        mask_preview = np.zeros(img_bgr.shape[:2], dtype=np.uint8)
+        for x, y in puntos_activos:
+            mask_preview[y, x] = 255
+
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+            mask_preview, connectivity=8
+        )
+
+        for i in range(1, num_labels):
+            cx, cy = centroids[i]
+            cv2.circle(overlay, (int(cx), int(cy)), 4, (0, 0, 255), -1)
+
         cv2.addWeighted(overlay, 0.6, vista, 0.4, 0, vista)
+
         vista = cv2.resize(
             vista, None, fx=zoom, fy=zoom, interpolation=cv2.INTER_NEAREST
         )
         cv2.imshow(ventana, vista)
 
     def mouse(event, x, y, flags, param):
-        nonlocal puntos_activos
+
         rx, ry = int(x / zoom), int(y / zoom)
 
         if event == cv2.EVENT_LBUTTONDOWN:
@@ -188,25 +210,13 @@ def vista_previa_y_editar_hex(
             else:
                 for dx in range(-brush, brush + 1):
                     for dy in range(-brush, brush + 1):
-                        nx, ny = rx + dx, ry + dy
-                        if 0 <= nx < img_bgr.shape[1] and 0 <= ny < img_bgr.shape[0]:
-                            puntos_activos.add((nx, ny))
+                        puntos_activos.add((rx + dx, ry + dy))
 
             dibujar()
 
     cv2.namedWindow(ventana, cv2.WINDOW_NORMAL)
     cv2.setMouseCallback(ventana, mouse)
     dibujar()
-
-    print("""
-🖱 CONTROLES:
-• Clic izquierdo → borrar / agregar puntos
-• ENTER → guardar y cerrar
-• ESC → salir sin guardar
-• R → restaurar puntos originales
-• + / - → tamaño pincel
-• Z → reset zoom
-""")
 
     while True:
         key = cv2.waitKey(30) & 0xFF
@@ -215,25 +225,43 @@ def vista_previa_y_editar_hex(
             np.save("puntos_temp.npy", np.array(list(puntos_activos)))
             print("💾 Puntos guardados")
             break
-
         elif key == 27:  # ESC
-            print("❌ Edición cancelada")
+            print("❌ Cancelado")
             break
-
         elif key == ord("r"):
             puntos_activos = set(puntos_originales)
             dibujar()
-
         elif key in (ord("+"), ord("=")):
             brush = min(20, brush + 1)
-            print(f"🖌 Pincel: {brush}")
-
         elif key == ord("-"):
             brush = max(1, brush - 1)
-            print(f"🖌 Pincel: {brush}")
-
         elif key == ord("z"):
             zoom = 1.0
             dibujar()
 
     cv2.destroyAllWindows()
+
+def estimar_tile_size(coords):
+    xs = sorted(set(p[0] for p in coords))
+    diffs = [xs[i+1] - xs[i] for i in range(len(xs)-1)]
+    diffs = [d for d in diffs if d > 1]
+
+    if not diffs:
+        return 1
+
+    return int(np.median(diffs))
+
+def agrupar_por_tiles(coords, tile):
+    tiles = {}
+
+    for x, y in coords:
+        tx = (x // tile) * tile
+        ty = (y // tile) * tile
+        tiles.setdefault((tx, ty), []).append((x, y))
+
+    return tiles
+
+def centro_tile(pixels):
+    xs = [p[0] for p in pixels]
+    ys = [p[1] for p in pixels]
+    return int(sum(xs) / len(xs)), int(sum(ys) / len(ys))
